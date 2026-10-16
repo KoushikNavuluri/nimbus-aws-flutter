@@ -1,0 +1,58 @@
+# Nimbus on GitHub Pages
+# Builds the web app and deploys it to https://<you>.github.io/<repo>/ on every push to main.
+# One-time: Settings > Pages > Build and deployment > Source = "GitHub Actions".
+# Note: Pages on a PRIVATE repo needs GitHub Pro/Team, and the site itself is public.
+name: Deploy web to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup (platform folders, icon, packages)
+        run: dart run tool/setup.dart
+
+      - name: Build web
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - name: SPA fallback
+        run: cp build/web/index.html build/web/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
