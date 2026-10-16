@@ -1,0 +1,48 @@
+# Optional: automatic builds on GitHub.
+# Move this file to .github/workflows/build-nimbus.yml (GitHub web UI: Add file > Create new file,
+# name it .github/workflows/build-nimbus.yml and paste this). Every push to main then analyzes,
+# tests and publishes an installable Android APK + web build under Releases.
+name: Build Nimbus
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Setup (platform folders + icon)
+        run: dart run tool/setup.dart
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test
+        run: flutter test
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Build web
+        run: flutter build web --release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk nimbus.apk
+          (cd build/web && zip -qr ../../nimbus-web.zip .)
+          gh release create "v1.0.${{ github.run_number }}" nimbus.apk nimbus-web.zip \
+            --title "Nimbus v1.0.${{ github.run_number }}" \
+            --notes "Android APK (download on your phone and tap to install) and a web build. Built from ${{ github.sha }}." \
+            --latest
