@@ -14,6 +14,7 @@ Future<void> main() async {
   if (missing.isNotEmpty) {
     await _run('flutter', ['create', '.', '--project-name', 'nimbus', '--org', 'dev.koushik', '--platforms=android,ios,web']);
   }
+  _dropTemplateTest();
   _patch('android/app/src/main/AndroidManifest.xml',
       (s) => s.replaceFirst(RegExp(r'android:label="[^"]*"'), 'android:label="Nimbus"'));
   _patch('ios/Runner/Info.plist', (s) => s.replaceAllMapped(
@@ -36,6 +37,19 @@ Future<void> main() async {
     await _run('dart', ['run', 'flutter_launcher_icons'], mustPass: false);
   }
   stdout.writeln('\nDone. Start Nimbus with:  flutter run');
+}
+
+/// `flutter create .` drops in the counter-app smoke test, which pumps `MyApp`.
+/// Nimbus has no MyApp (it ships its own tests), so that file would break analyze and test.
+void _dropTemplateTest() {
+  final stub = File('test/widget_test.dart');
+  if (!stub.existsSync()) return;
+  final entry = File('lib/main.dart');
+  final hasMyApp = entry.existsSync() && entry.readAsStringSync().contains('class MyApp');
+  if (stub.readAsStringSync().contains('MyApp') && !hasMyApp) {
+    stub.deleteSync();
+    stdout.writeln('  removed the template test/widget_test.dart');
+  }
 }
 
 Future<void> _run(String cmd, List<String> args, {bool mustPass = true}) async {
