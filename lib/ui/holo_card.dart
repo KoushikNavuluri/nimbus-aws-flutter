@@ -236,7 +236,7 @@ class _BackPattern extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BackPattern o) => false;
+  bool shouldRepaint(_BackPattern oldDelegate) => false;
 }
 
 class CardInfoBack extends StatelessWidget {
@@ -396,8 +396,9 @@ class FoilPainter extends CustomPainter {
       final p2 = Paint()
         ..color = const Color(0x99FFFFFF)
         ..blendMode = BlendMode.overlay;
-      for (double y = 17 - 37; y < h; y += 37) {
-        for (double x = 11 - 37; x < w; x += 37) {
+      // Offset grid (17 - 37, 11 - 37) written as double literals so Dart accepts them.
+      for (double y = -20.0; y < h; y += 37) {
+        for (double x = -26.0; x < w; x += 37) {
           canvas.drawCircle(Offset(x + 18.5, y + 18.5), 0.9, p2);
         }
       }
@@ -406,7 +407,7 @@ class FoilPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(FoilPainter o) => o.strength != strength || o.sparkle != sparkle || o.radius != radius;
+  bool shouldRepaint(FoilPainter oldDelegate) => oldDelegate.strength != strength || oldDelegate.sparkle != sparkle || oldDelegate.radius != radius;
 }
 
 class HoloCard extends StatefulWidget {

@@ -356,7 +356,8 @@ class _LabBuildScreenState extends State<LabBuildScreen> {
     final res = _res;
     final running = _phase == 'running' || _phase == 'chaos';
     final showFail = (_phase == 'chaos' || _phase == 'final') && res != null && !res.survived;
-    final failedSlot = showFail ? (res.failed ?? sc.slots.last.id) : null;
+    // `res != null` sits in the condition itself so Dart promotes it in the true branch.
+    final String? failedSlot = (res != null && showFail) ? (res.failed ?? sc.slots.last.id) : null;
     final chaosIcon = chaosIconFor(sc.chaosIcon);
 
     final body = <Widget>[
@@ -794,7 +795,7 @@ class _LabBuildScreenState extends State<LabBuildScreen> {
           children: [
             Expanded(child: NBtn(label: 'Rebuild', icon: Icons.restart_alt_rounded, kind: Btn.soft, expand: true, onTap: _reset)),
             const SizedBox(width: 8),
-            Expanded(child: NBtn(label: 'Done', icon: Icons.check_rounded, expand: true, onTap: Nav.pop)),
+            Expanded(child: NBtn(label: 'Done', icon: Icons.check_rounded, expand: true, onTap: () => Nav.pop())),
           ],
         ),
       ));
@@ -992,7 +993,7 @@ class _WirePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WirePainter o) => o.t != t || o.color != color;
+  bool shouldRepaint(_WirePainter oldDelegate) => oldDelegate.t != t || oldDelegate.color != color;
 }
 
 class _Breathe extends StatefulWidget {
