@@ -1,0 +1,125 @@
+# Nimbus CI
+# Every push to main and every pull request: analyze + test.
+# Pushes to main (and manual runs) also build an installable Android APK and a
+# web bundle. Grab them from the run page, under "Artifacts".
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Setup (platform folders, icon, packages)
+        id: setup
+        run: dart run tool/setup.dart
+
+      - name: Analyze
+        id: analyze
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt
+
+      # Runs even if analyze failed, so one run shows you everything.
+      - name: Test
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee test.txt
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Nimbus checks"
+            if [ -f analyze.txt ]; then
+              echo "### flutter analyze"
+              echo '```'
+              tail -n 200 analyze.txt
+              echo '```'
+            fi
+            if [ -f test.txt ]; then
+              echo "### flutter test"
+              echo '```'
+              tail -n 100 test.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimbus-logs
+          path: |
+            analyze.txt
+            test.txt
+          if-no-files-found: ignore
+
+  build:
+    name: Build APK and web
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup (platform folders, icon, packages)
+        run: dart run tool/setup.dart
+
+      - name: Build Android APK
+        run: flutter build apk --release --build-number ${{ github.run_number }}
+
+      - name: Build web
+        run: flutter build web --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimbus-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimbus-web
+          path: build/web
+          retention-days: 14
