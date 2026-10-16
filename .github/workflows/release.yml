@@ -1,0 +1,115 @@
+# Nimbus Release
+# Publishes a GitHub Release with the Android APK + a zipped web build.
+# Trigger it either way:
+#   1. Push a tag:      git tag v1.0.0 && git push origin v1.0.0
+#   2. Manually:        Actions > Release > Run workflow (optionally type a version)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version like 1.0.0 (leave empty for 1.0.<run number>)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN: ${{ github.run_number }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            v="${REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+            v="${INPUT_VERSION#v}"
+          else
+            v="1.0.$RUN"
+          fi
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$v' must look like 1.2.3"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup (platform folders, icon, packages)
+        run: dart run tool/setup.dart
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      - name: Build Android APK
+        run: flutter build apk --release --build-name ${{ steps.v.outputs.version }} --build-number ${{ github.run_number }}
+
+      - name: Build web
+        run: flutter build web --release
+
+      - name: Package
+        shell: bash
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/nimbus-$V.apk"
+          (cd build/web && zip -qr "../../dist/nimbus-web-$V.zip" .)
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          ls -lh dist
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          cat > notes.md <<NOTES
+          **Android:** download \`nimbus-$V.apk\` on your phone, open it and allow installs from this source.
+
+          **Web:** unzip \`nimbus-web-$V.zip\` and serve the folder (for example \`python3 -m http.server\`), then open it in a browser.
+
+          Built from ${GITHUB_SHA}. The APK is signed with the default debug key: fine for sideloading, not for the Play Store.
+          NOTES
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "Nimbus $TAG" \
+              --notes-file notes.md \
+              --generate-notes \
+              --latest
+          fi
