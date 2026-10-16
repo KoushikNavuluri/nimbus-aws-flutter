@@ -23,12 +23,12 @@ String _rgb(int r, int g, int b) => '#${((r << 16) | (g << 8) | b).toRadixString
 String hexOf(int argb) => _rgb((argb >> 16) & 255, (argb >> 8) & 255, argb & 255);
 
 String tintHex(int argb, double amt) {
-  int f(int v) => (v + (255 - v) * amt).round().clamp(0, 255);
+  int f(int v) => (v + (255 - v) * amt).round().clamp(0, 255).toInt();
   return _rgb(f((argb >> 16) & 255), f((argb >> 8) & 255), f(argb & 255));
 }
 
 String shadeHex(int argb, double amt) {
-  int f(int v) => (v * (1 - amt)).round().clamp(0, 255);
+  int f(int v) => (v * (1 - amt)).round().clamp(0, 255).toInt();
   return _rgb(f((argb >> 16) & 255), f((argb >> 8) & 255), f(argb & 255));
 }
 

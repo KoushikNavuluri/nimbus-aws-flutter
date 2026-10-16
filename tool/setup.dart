@@ -6,7 +6,7 @@
 // 4. Gets packages and generates launcher icons.
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data' show ByteData, Uint8List;
+import 'dart:typed_data' show ByteData, BytesBuilder, Uint8List;
 
 Future<void> main() async {
   stdout.writeln('Setting up Nimbus...');

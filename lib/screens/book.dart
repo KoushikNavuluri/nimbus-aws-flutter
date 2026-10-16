@@ -13,6 +13,7 @@ import '../sound.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../ui/kit.dart';
+import '../ui/motion.dart';
 
 const _noSwipe = {'widget', 'sort', 'cli', 'pick'};
 const _paper = [Color(0xFFFFE3EB), Color(0xFFDDF8F0), Color(0xFFECE9FF), Color(0xFFE1F0FF), Color(0xFFFFF1D9), Color(0xFFEBF8DF)];
